@@ -3,8 +3,11 @@ import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:provider/provider.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
+
+import 'notification_provider.dart';
 
 class NewNotificationPage extends StatefulWidget {
   const NewNotificationPage({super.key});
@@ -47,9 +50,13 @@ class _NewNotificationPageState extends State<NewNotificationPage> {
     if (response2.statusCode == 200) {
       final data = json.decode(response2.body);
 
-      String date = data['date'];
-      String city = data['city'];
-      String country = data['country'];
+      String date = '04-07-2024';
+      String city = 'Dhaka';
+      String country = 'Bangladesh';
+
+      // String date = data['date'];
+      // String city = data['city'];
+      // String country = data['country'];
 
       final response = await http.get(Uri.parse("https://assalam.icam.com.bd/public/api/prayerTime/$date/$city/$country"));
       if (response.statusCode == 200) {
@@ -92,6 +99,10 @@ class _NewNotificationPageState extends State<NewNotificationPage> {
 
   Future<void> scheduleNotification(List<Time> scheduledTimes) async {
     final now = DateTime.now();
+    final notificationProvider = Provider.of<NotificationProvider>(context, listen: false);
+    if (!notificationProvider.notificationsEnabled) {
+      return;
+    }
 
     for (int j = 0; j < scheduledTimes.length; j++) {
       var scheduledDate = DateTime(
@@ -107,13 +118,13 @@ class _NewNotificationPageState extends State<NewNotificationPage> {
       }
 
       final notificationBody = posts.isNotEmpty ? posts[j % posts.length]['name'] as String : 'It\'s time for prayer';
-
+      final notificationSound = notificationProvider.selectedSound;
       final android = AndroidNotificationDetails(
         'scheduled_notification',
         'Scheduled Notifications',
         channelDescription: 'This channel is used for scheduled notifications',
         playSound: true,
-        sound: RawResourceAndroidNotificationSound('azan'),
+        sound: RawResourceAndroidNotificationSound(notificationSound),
         importance: Importance.max,
         priority: Priority.high,
       );

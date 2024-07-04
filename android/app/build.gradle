@@ -55,6 +55,7 @@ android {
         targetSdkVersion 34
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
+        multiDexEnabled = true
     }
 
     signingConfigs {
@@ -82,4 +83,5 @@ flutter {
 
 dependencies {
     implementation 'com.google.android.gms:play-services-wallet:19.1.0'
+    implementation("androidx.multidex:multidex:2.0.1")
 }

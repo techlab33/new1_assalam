@@ -1,143 +1,211 @@
+import 'dart:math' show pi, sin, cos, atan2, tan;
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_compass/flutter_compass.dart';
-import 'dart:math' as math;
+import 'package:permission_handler/permission_handler.dart';
 
 
 class QiblaPage extends StatefulWidget {
   @override
-  _QiblaCompassState createState() => _QiblaCompassState();
+  _QiblaPageState createState() => _QiblaPageState();
 }
 
-class _QiblaCompassState extends State<QiblaPage> {
-
-  double? _direction;
-  double? _qiblaDirection;
-  double? _makkahDirection;
+class _QiblaPageState extends State<QiblaPage> {
+  double _direction = 0;
+  double _qiblaDirection = 0;
   Position? _currentPosition;
-
-  final double makkahLat = 21.4225;
-  final double makkahLon = 39.8262;
+  final double kaabaLat = 21.4225;
+  final double kaabaLong = 39.8262;
+  bool _hasPermissions = false;
 
   @override
   void initState() {
     super.initState();
-    _getCurrentLocation();
-    _getCompassDirection();
+    _checkPermissions();
+  }
+
+  void _checkPermissions() async {
+    final locationStatus = await Permission.locationWhenInUse.request();
+    if (locationStatus.isGranted) {
+      _getCurrentLocation();
+      _initCompass();
+      setState(() {
+        _hasPermissions = true;
+      });
+    } else {
+      setState(() {
+        _hasPermissions = false;
+      });
+    }
   }
 
   void _getCurrentLocation() async {
-    bool serviceEnabled;
-    LocationPermission permission;
-
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      return;
+    try {
+      Position position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high);
+      setState(() {
+        _currentPosition = position;
+        _calculateQiblaDirection();
+      });
+    } catch (e) {
+      print("Error: $e");
     }
-
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        return;
-      }
-    }
-
-    if (permission == LocationPermission.deniedForever) {
-      return;
-    }
-
-    _currentPosition = await Geolocator.getCurrentPosition();
-    _calculateDirections();
   }
 
-  void _getCompassDirection() {
-    FlutterCompass.events!.listen((CompassEvent event) {
+  void _initCompass() {
+    FlutterCompass.events?.listen((CompassEvent event) {
       setState(() {
-        _direction = event.heading;
+        _direction = event.heading ?? 0;
       });
     });
   }
 
-  void _calculateDirections() {
+  void _calculateQiblaDirection() {
     if (_currentPosition != null) {
-      final kaaba = _toRadians(makkahLat);
-      final kaaba_lon = _toRadians(makkahLon);
-      final lat = _toRadians(_currentPosition!.latitude);
-      final lon = _toRadians(_currentPosition!.longitude);
+      double lat = _currentPosition!.latitude;
+      double long = _currentPosition!.longitude;
 
-      final y = math.sin(kaaba_lon - lon);
-      final x = math.cos(lat) * math.tan(kaaba) -
-          math.sin(lat) * math.cos(kaaba_lon - lon);
+      double latRad = _toRadians(lat);
+      double longRad = _toRadians(long);
+      double kaabaLatRad = _toRadians(kaabaLat);
+      double kaabaLongRad = _toRadians(kaabaLong);
 
-      var qibla = math.atan2(y, x);
-      qibla = _toDegrees(qibla);
-      qibla = (qibla + 360) % 360;
+      double y = sin(kaabaLongRad - longRad);
+      double x = cos(latRad) * tan(kaabaLatRad) - sin(latRad) * cos(kaabaLongRad - longRad);
 
-      final dLon = kaaba_lon - lon;
-      final y_makkah = math.sin(dLon) * math.cos(kaaba);
-      final x_makkah = math.cos(lat) * math.sin(kaaba) -
-          math.sin(lat) * math.cos(kaaba) * math.cos(dLon);
-
-      var makkah = math.atan2(y_makkah, x_makkah);
-      makkah = _toDegrees(makkah);
-      makkah = (makkah + 360) % 360;
+      double qiblaRad = atan2(y, x);
+      double qiblaDeg = _toDegrees(qiblaRad);
 
       setState(() {
-        _qiblaDirection = qibla;
-        _makkahDirection = makkah;
+        _qiblaDirection = (qiblaDeg + 360) % 360;
       });
     }
   }
 
   double _toRadians(double degree) {
-    return degree * math.pi / 180;
+    return degree * pi / 180;
   }
 
   double _toDegrees(double radian) {
-    return radian * 180 / math.pi;
+    return radian * 180 / pi;
+  }
+
+  String _getCardinalDirection(double degrees) {
+    const List<String> cardinals = ["N", "NE", "E", "SE", "S", "SW", "W", "NW", "N"];
+    return cardinals[(degrees / 45).round() % 8];
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text('Qibla Direction')),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            if (_direction != null && _qiblaDirection != null)
-              Stack(
-                    children: [
-                      Container(
-                        child: Transform.rotate(
-                          angle: ((_direction! - _qiblaDirection!) * (math.pi / 180) * -1),
-                          child: Image.asset('assets/images/compass.png', scale: 1.5),
-                        ),
-                      ),
-                      Container(
-                          child:Transform.rotate(
-                            angle: ((_direction! - _makkahDirection!) * (math.pi / 180) * -1),
-                            child: Image.asset('assets/images/kata.png', scale: 1.5),
-                          )
-                      )
+      body: _hasPermissions
+          ? Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: <Widget>[
+          Text(
+            'Qibla Direction: ${_qiblaDirection.toStringAsFixed(2)}° (${_getCardinalDirection(_qiblaDirection)})',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          SizedBox(height: 20),
+          Stack(
+            alignment: Alignment.center,
+            children: <Widget>[
+              Container(
+                width: 300,
+                height: 300,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.grey[200],
+                ),
+                child: CustomPaint(
+                  painter: CompassPainter(_direction),
+                ),
+              ),
+              Transform.rotate(
+                angle: ((_qiblaDirection - _direction) * (pi / 180)),
+                child: Icon(Icons.arrow_upward, size: 120, color: Colors.green),
+              ),
+            ],
+          ),
+          SizedBox(height: 20),
+          Text(
+            'Current Location:',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          Text(
+            _currentPosition != null
+                ? '${_currentPosition!.latitude.toStringAsFixed(4)}, ${_currentPosition!.longitude.toStringAsFixed(4)}'
+                : 'Unknown',
+            style: TextStyle(fontSize: 16),
+          ),
         ],
-      ),
-
-            SizedBox(height: 20),
-            Text(
-              'Qibla Direction: ${_qiblaDirection?.toStringAsFixed(2) ?? "Calculating..."}°',
-              style: TextStyle(fontSize: 20),
-            ),
-            SizedBox(height: 10),
-            Text(
-              'Makkah Direction: ${_makkahDirection?.toStringAsFixed(2) ?? "Calculating..."}°',
-              style: TextStyle(fontSize: 20),
-            ),
-
-          ],
+      )
+          : Center(
+        child: Text(
+          'Location permission is required to use this app.',
+          style: TextStyle(fontSize: 18),
+          textAlign: TextAlign.center,
         ),
       ),
     );
   }
+}
+
+class CompassPainter extends CustomPainter {
+  final double direction;
+
+  CompassPainter(this.direction);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0
+      ..color = Colors.black;
+
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2;
+
+    canvas.drawCircle(center, radius, paint);
+
+    final markerPaint = Paint()
+      ..style = PaintingStyle.fill
+      ..color = Colors.red;
+
+    for (int i = 0; i < 360; i += 30) {
+      final angle = (i - direction) * (pi / 180);
+      final markerStart = Offset(
+        center.dx + (radius - 10) * cos(angle),
+        center.dy + (radius - 10) * sin(angle),
+      );
+      final markerEnd = Offset(
+        center.dx + radius * cos(angle),
+        center.dy + radius * sin(angle),
+      );
+
+      canvas.drawLine(markerStart, markerEnd, markerPaint);
+
+      if (i % 90 == 0) {
+        final textPainter = TextPainter(
+          text: TextSpan(
+            text: ['E', 'N', 'W', 'S'][i ~/ 90],
+            style: TextStyle(color: Colors.black, fontSize: 20),
+          ),
+          textDirection: TextDirection.ltr,
+        );
+        textPainter.layout();
+        textPainter.paint(
+          canvas,
+          Offset(
+            center.dx + (radius - 30) * cos(angle) - textPainter.width / 2,
+            center.dy + (radius - 30) * sin(angle) - textPainter.height / 2,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(CustomPainter oldDelegate) => true;
 }

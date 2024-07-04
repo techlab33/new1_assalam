@@ -3,12 +3,32 @@ import 'package:provider/provider.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'notification_provider.dart';
 
-class NotificationSettingsPage extends StatelessWidget {
-  final List<String> prayerNames = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
-  final AudioPlayer audioPlayer = AudioPlayer();
+class NotificationSettingsPage extends StatefulWidget {
+  @override
+  _NotificationSettingsPageState createState() => _NotificationSettingsPageState();
+}
 
-  Future<void> playSound(String soundName) async {
-    await audioPlayer.play(AssetSource('sounds/$soundName.wav'));
+class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
+  final List<String> prayerNames = [
+    'Imsak', 'Fajr', 'Sunrise', 'Dhuha', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'
+  ];
+
+  final AudioPlayer audioPlayer = AudioPlayer();
+  String? currentlyPlayingSound;
+
+  Future<void> toggleSound(String soundName) async {
+    if (currentlyPlayingSound == soundName) {
+      await audioPlayer.pause();
+      setState(() {
+        currentlyPlayingSound = null;
+      });
+    } else {
+      await audioPlayer.stop();
+      await audioPlayer.play(AssetSource('sounds/$soundName.wav'));
+      setState(() {
+        currentlyPlayingSound = soundName;
+      });
+    }
   }
 
   @override
@@ -30,15 +50,22 @@ class NotificationSettingsPage extends StatelessWidget {
               padding: EdgeInsets.symmetric(horizontal: 20),
               child: Column(
                 children: notificationProvider.notificationSounds.map((sound) {
-                  return RadioListTile<String>(
+                  bool isPlaying = currentlyPlayingSound == sound;
+                  return ListTile(
                     title: Text(sound),
-                    value: sound,
-                    groupValue: notificationProvider.selectedSound,
-                    onChanged: (value) async {
-                      await notificationProvider.setNotificationSound(value!);
-                      playSound(value);
+                    trailing: IconButton(
+                      icon: Icon(isPlaying ? Icons.pause : Icons.play_arrow),
+                      onPressed: () {
+                        toggleSound(sound);
+                        notificationProvider.setNotificationSound(sound);
+                      },
+                    ),
+                    selected: notificationProvider.selectedSound == sound,
+                    onTap: () {
+                      toggleSound(sound);
+                      notificationProvider.setNotificationSound(sound);
                     },
-                    activeColor: Color(0xFF035408),
+                    selectedTileColor: Colors.grey[200],
                   );
                 }).toList(),
               ),
@@ -49,6 +76,12 @@ class NotificationSettingsPage extends StatelessWidget {
               value: notificationProvider.notificationsEnabled,
               onChanged: (value) {
                 notificationProvider.toggleAllNotifications(value);
+                if (!value) {
+                  audioPlayer.pause();
+                  setState(() {
+                    currentlyPlayingSound = null;
+                  });
+                }
               },
               activeColor: Color(0xFF035408),
             ),
@@ -60,18 +93,16 @@ class NotificationSettingsPage extends StatelessWidget {
                 value: isEnabled,
                 onChanged: (value) {
                   notificationProvider.toggleNotification(prayerName, value);
+                  if (!value) {
+                    audioPlayer.pause();
+                    setState(() {
+                      currentlyPlayingSound = null;
+                    });
+                  }
                 },
                 activeColor: Color(0xFF035408),
               );
             }).toList(),
-            SizedBox(height: 20),
-            ElevatedButton(
-              child: Text('Refresh Location'),
-              onPressed: () {
-                notificationProvider.refreshLocation();
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: Color(0xFF035408)),
-            ),
           ],
         ),
       ),

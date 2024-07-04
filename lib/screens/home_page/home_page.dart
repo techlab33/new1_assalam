@@ -66,7 +66,6 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     initializePlayer();
     fetchLocation();
-
     _checkInitialConnectivity();
     _connectivity.onConnectivityChanged.listen(_updateConnectionStatus);
 
@@ -128,9 +127,9 @@ class _HomePageState extends State<HomePage> {
   void initNotifications() {
     flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
     const android = AndroidInitializationSettings('@drawable/notification_icon');
-    const initializationSettings =
-    InitializationSettings(android: android);
+    const initializationSettings = InitializationSettings(android: android);
     flutterLocalNotificationsPlugin.initialize(initializationSettings);
+    tz.initializeTimeZones();
   }
 
   Future<void> requestNotificationPermission() async {
@@ -166,11 +165,11 @@ class _HomePageState extends State<HomePage> {
 
     final now = DateTime.now();
     final scheduledTimes = [
-      Time(4, 00, 0),
-      Time(11, 59, 0),
-      Time(15, 17, 0),
-      Time(18, 58, 0),
-      Time(19, 58, 0),
+      Time(5, 0, 0),
+      Time(12, 58, 0),
+      Time(16, 20, 0),
+      Time(18, 50, 0),//18.50
+      Time(19, 52, 0),
     ];
 
     final notificationSound = notificationProvider.selectedSound;
@@ -209,7 +208,6 @@ class _HomePageState extends State<HomePage> {
       );
     }
   }
-
 //====================notification end ==================//
 
   //===========internet checker start================//
