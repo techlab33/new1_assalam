@@ -165,11 +165,11 @@ class _HomePageState extends State<HomePage> {
 
     final now = DateTime.now();
     final scheduledTimes = [
-      Time(5, 0, 0),
-      Time(12, 58, 0),
-      Time(16, 20, 0),
-      Time(18, 50, 0),//18.50
-      Time(19, 52, 0),
+      Time(5, 3, 0),
+      Time(11, 58, 0),
+      Time(15, 20, 0),
+      Time(17, 51, 0),//18.50
+      Time(19, 51, 0),//19.52
     ];
 
     final notificationSound = notificationProvider.selectedSound;
@@ -208,6 +208,7 @@ class _HomePageState extends State<HomePage> {
       );
     }
   }
+
 //====================notification end ==================//
 
   //===========internet checker start================//
