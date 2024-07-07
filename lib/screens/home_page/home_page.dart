@@ -121,6 +121,8 @@ class _HomePageState extends State<HomePage> {
 
   //============notification start==========//
 
+
+
   List<dynamic> posts = [];
   late FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin;
 
@@ -144,70 +146,100 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+
   Future<void> downloadJson() async {
-    final response = await http.get(Uri.parse(
-        "https://raw.githubusercontent.com/techlab33/nubtk/main/new.json"));
+    final response = await http.get(Uri.parse("https://raw.githubusercontent.com/techlab33/nubtk/main/new.json"));
     if (response.statusCode == 200) {
       setState(() {
         posts = json.decode(response.body);
-        scheduleNotification();
+        fetchPrayerTimesAndScheduleNotifications();
       });
     } else {
       throw Exception("Something went wrong while fetching data.");
     }
   }
 
-  void scheduleNotification() {
+  Future<void> fetchPrayerTimesAndScheduleNotifications() async {
+    try {
+      final PrayerTimeDataModel? prayerTimeDataModel = await prayerTimeGetData.fetchPrayerTimeData(formattedDate, currentCity!, currentCountry!);
+      if (prayerTimeDataModel != null && prayerTimeDataModel.data != null) {
+        scheduleNotification(prayerTimeDataModel);
+        log('Prayer time fetch successfully');
+      } else {
+        print("Error: Prayer time data is null");
+      }
+    } catch (error) {
+      print("Error fetching prayer times: $error");
+    }
+  }
+
+  void scheduleNotification(PrayerTimeDataModel prayerTimeDataModel) {
     final notificationProvider = Provider.of<NotificationProvider>(context, listen: false);
     if (!notificationProvider.notificationsEnabled) {
       return;
     }
 
     final now = DateTime.now();
-    final scheduledTimes = [
-      Time(5, 3, 0),
-      Time(11, 58, 0),
-      Time(15, 20, 0),
-      Time(17, 51, 0),//18.50
-      Time(19, 51, 0),//19.52
-    ];
+    final prayerTimes = {
+      'Test': '15:50',
+      'Fajr': prayerTimeDataModel.data?.timings.fajr,
+      'Dhuhr': prayerTimeDataModel.data?.timings.dhuhr,
+      'Asr': prayerTimeDataModel.data?.timings.asr,
+      'Maghrib': prayerTimeDataModel.data?.timings.maghrib,
+      'Isha': prayerTimeDataModel.data?.timings.isha
+    };
 
     final notificationSound = notificationProvider.selectedSound;
 
-    for (int j = 0; j < scheduledTimes.length; j++) {
-      var scheduledDate = DateTime(
-        now.year,
-        now.month,
-        now.day,
-        scheduledTimes[j].hour,
-        scheduledTimes[j].minute,
-        scheduledTimes[j].second,
-      );
-      if (scheduledDate.isBefore(now)) {
-        scheduledDate = scheduledDate.add(Duration(days: 1));
-      }
+    int id = 0;
+    prayerTimes.forEach((name, time) {
+      if (time != null) {
+        try {
+          var scheduledTime = DateFormat("HH:mm").parse(time);
+          var scheduledDate = DateTime(
+            now.year,
+            now.month,
+            now.day,
+            scheduledTime.hour,
+            scheduledTime.minute,
+          );
 
-      final notificationBody = posts[j]['name'] as String;
-      final android = AndroidNotificationDetails(
-        'scheduled_notification',
-        'Scheduled Notifications',
-        playSound: true,
-        sound: RawResourceAndroidNotificationSound(notificationSound),
-        importance: Importance.max,
-        priority: Priority.high,
-      );
-      final platform = NotificationDetails(android: android);
-      flutterLocalNotificationsPlugin.zonedSchedule(
-        j,
-        'ASSALAM',
-        notificationBody,
-        tz.TZDateTime.from(scheduledDate, tz.local),
-        platform,
-        androidAllowWhileIdle: true,
-        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
-      );
-    }
+          if (scheduledDate.isBefore(now)) {
+            scheduledDate = scheduledDate.add(Duration(days: 1));
+          }
+
+          final notificationBody = posts.isNotEmpty ? posts[id % posts.length]['name'] as String : 'Prayer Time';
+
+          final android = AndroidNotificationDetails(
+            'scheduled_notification',
+            'Scheduled Notifications',
+            playSound: true,
+            sound: RawResourceAndroidNotificationSound(notificationSound),
+            importance: Importance.max,
+            priority: Priority.high,
+          );
+          final platform = NotificationDetails(android: android);
+
+          flutterLocalNotificationsPlugin.zonedSchedule(
+            id, // Unique ID for the notification
+            name, // Title
+            notificationBody, // Body
+            tz.TZDateTime.from(scheduledDate, tz.local), // Scheduled time
+            platform,
+            androidAllowWhileIdle: true,
+            uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+          );
+
+          id++;
+        } catch (e) {
+          print("Error scheduling notification for $name: $e");
+        }
+      } else {
+        print("Error: Prayer time for $name is null");
+      }
+    });
   }
+
 
 //====================notification end ==================//
 
